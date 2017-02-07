@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width,initial-scale=1,minimum-scale=1,maximum-scale=1,user-scalable=no" />
+		<title>LYW</title>
+		<style type="text/css">
+			*{
+				margin: 0;
+				padding: 0;	
+			}
+			html,body{
+				height: 100%;
+				overflow: hidden;
+			}
+			#head{
+				height: 2rem;
+				line-height: 2rem;
+				font-family: "微软雅黑";
+				font-size: 1.1rem;
+				color:white;
+				background-color: rgba(0,0,0,.7);
+				text-align: center;
+			}
+			#wrap{
+				position:absolute;
+				top:2rem;
+				bottom: 0;
+				width: 100%;
+				overflow: hidden;
+			}
+			#content{
+				width:100%;
+				position:relative;
+			}
+			#list{
+				list-style: none;
+				/*请浮动*/
+				overflow: hidden;
+			}
+			#list li{
+				float: left;
+				width: 7rem;
+				height: 7rem;
+				margin: 0.5rem;
+				background:url(img/loadingImg.gif)no-repeat center;
+			}
+			#list li img{
+				display: block;
+				width: 100%;
+				border-radius: 4px;
+				opacity: 0;
+				transition: opacity 0.5s;
+			}
+			#footer{
+				height:4rem;
+				width: 100%;
+				line-height:4rem;
+				position:absolute;
+				text-align: center;
+				bottom:-4rem;
+			}
+			#scrollBar{
+				position:absolute;
+				top:0;
+				right:0;
+				width: 5px;
+				height: 100%;
+				background-color: deeppink;
+				opacity: 0;
+				transition:opacity 1s;
+			}
+		</style>
+	</head>
+	<body>
+		<header id="head">三国女将</header>
+		<section id="wrap">
+			<section id="content">
+				<ul id="list">
+				</ul>
+				<footer id="footer">上滑加载更多</footer>
+			</section>
+			<div id="scrollBar"></div>
+		</section>
+	</body>
+	<script src="js/new_transform.js" type="text/javascript" charset="utf-8"></script>
+	<script type="text/javascript">
+		/*清除默认行为*/
+		document.addEventListener('touchstart',function(ev){
+			var e = ev||window.event;
+			e.preventDefault();
+		});
+		/*rem适配*/
+		(function(){
+			var width = document.documentElement.clientWidth/16;
+			var styleNode = document.createElement('style');
+			styleNode.innerHTML = 'html{font-size:'+width+'px!important}';
+			document.head.appendChild(styleNode);
+		})();
+		
+		window.onload = function(){
+			var wrap = document.querySelector('#wrap');
+			var list = document.querySelector('#list');
+			var lis = list.getElementsByTagName('li');	//坑一：queryseletor上有坑，不用
+			var head = document.querySelector('#head');
+			var footer = document.querySelector('#footer');
+			var scrollBar = document.querySelector('#scrollBar');
+			var isBottom = false;	//定义用户是否滑到页面最底部的位置
+			var onlyOne = true;		//让大兄弟只出现一次
+			css(footer,"scale",0);
+			var urlArr = [];	//存储img图片的url
+			for(var i=0;i<40;i++){
+				urlArr.push('img/'+((i%18)+1)+'.jpg');
+			}
+			//创建li
+			var start = 0;
+			var length = 12;	//首先创建12个Li
+			createLi();
+			//坑二：在调用完createLi()之后在获取content的高度才能获取到
+			var content = document.querySelector('#content');
+			var maxScroll = content.offsetHeight - wrap.clientHeight;
+
+			function createLi(){
+				//当加载最后一次li时
+				if(onlyOne&&start>=urlArr.length){
+					onlyOne = false;
+					footer.innerHTML = '二货，别划拉了，没有了'
+					footer.style.color = 'red';
+					setTimeout(function(){
+						css(content,'translateY',-maxScroll)
+						content.style.transition = '1s';
+						footer.innerHTML = '';
+					},2000);
+					
+				}
+				var end = start+length;
+				end = end>urlArr.length?urlArr.length:end;
+				for(var i=start;i<end;i++){
+					var li = document.createElement('li');
+					li.src = urlArr[i];
+					li.isload = false;
+					list.appendChild(li);
+				}
+				
+				start = end;	//下次创建接着第12个创建
+
+				lazyLoad();
+			}
+			
+			function lazyLoad(){
+				var minY = head.offsetHeight;
+				var maxY = document.documentElement.clientHeight;
+				for(var i = 0;i<lis.length;i++){
+					var top = lis[i].getBoundingClientRect().top;
+					if(top>minY&&top<maxY&&!lis[i].isload){
+						createImg(lis[i]);
+						lis[i].isload = true;
+					}
+				}
+			}
+			
+			/* 坑三：
+			 * transtion没有办法获取到每一帧的状态（不能实现即点即停）
+			 	transtion 在元素没有完全渲染完的情况下是不会被触发的，
+			 	所以在触发img的opacity的过渡效果时要在图片加载完成之后再修改opacity
+			 * */
+			function createImg(li){
+				var img = new Image();
+				img.src = li.src;
+				li.appendChild(img);
+//				1.img有没有渲染完?==>>有
+//				2.img有没有被成功创建?==>>有
+				img.onload = function(){
+					img.style.opacity = '1';
+				}
+			}
+			
+			var callback = {
+				start: function(){
+					var scale = wrap.offsetHeight/content.offsetHeight;
+					scrollBar.style.height = scale*wrap.offsetHeight+'px';
+					scrollBar.style.opacity = 1;
+					
+					if(!onlyOne){
+						return;
+					}
+					//坑四：在动态改变dom结构后，需要重新获取content的高度
+					maxScroll = content.offsetHeight - wrap.clientHeight;
+					//判断是否到底部
+					var translateY = css(content,'translateY');
+					if(Math.abs(translateY)>=maxScroll){
+						isBottom = true;
+					}else{
+						isBottom = false;
+					}
+				},
+				move: function(){
+					var scale = wrap.offsetHeight/content.offsetHeight;
+					var dis = scale*css(content,'translateY');
+					css(scrollBar, 'translateY',-dis);
+					if(!onlyOne){
+						return;
+					}
+					lazyLoad();
+					if(isBottom){
+						//滑动到底部，让footer的scale从0到1，缩放系数 = 用户滑动的距离/footer的高度
+						var scale = (Math.abs(css(content, 'translateY'))-maxScroll)/footer.offsetHeight;
+						scale = Math.abs(scale)>1?1:Math.abs(scale);	//让scale的范围在0-1
+						css(footer, 'scale', scale);
+					}
+				},
+				end: function(){
+					if(!onlyOne){
+						return;
+					}
+					/*继续加载li的条件：
+					 	1.用户滑到了底部
+					 	2.用户将footer滑到了最大位置
+				 	*/
+				 	if(isBottom&&(Math.abs(css(content, 'translateY'))-maxScroll)>=footer.offsetHeight){
+				 		createLi();
+				 		clearInterval(wrap.cleartime);	//实现原地加载
+				 	}
+				},
+				over: function(){
+					scrollBar.style.opacity = 0;	//当content完全停止的时候滚动条消失
+				}
+			}
+			$.drag(wrap,callback);
+		}
+	</script>
+</html>
